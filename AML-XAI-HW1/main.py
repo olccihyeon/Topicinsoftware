@@ -123,8 +123,8 @@ def main():
         print('Average accuracy={:5.1f}%'.format(100 * np.mean(acc[t,:t+1])))
 
         print('Save at ' + args.output)
-        # np.savetxt(args.output, acc, '%.4f')
-        # torch.save(myModel.state_dict(), './trained_model/' + log_name + '_task_{}.pt'.format(t))
+        np.savetxt(args.output, acc, '%.4f')
+        torch.save(myModel.state_dict(), './trained_model/' + log_name + '_task_{}.pt'.format(t))
 
 
     print('*' * 100)
