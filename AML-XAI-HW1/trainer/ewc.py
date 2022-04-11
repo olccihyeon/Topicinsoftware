@@ -80,13 +80,13 @@ class Trainer(trainer.GenericTrainer):
         loss += celoss(output,targets)
         # Write youre code here
         fisher_loss = 0
-        model_fixed = {n: p.clone().detach() for n, p in self.model_fixed.named_parameters()
-                  }
-        for n, p in self.model.named_parameters():
-            
-            _loss = self.fisher[n] * ((p - model_fixed[n]) ** 2 )
-            fisher_loss += _loss.sum()
-        loss += self.lamb * fisher_loss
+        if self.t>0:
+            model_fixed = {n: p.clone().detach() for n, p in self.model_fixed.named_parameters()
+                    }
+            for n, p in self.model.named_parameters():
+                _loss = torch.sum(self.fisher[n] * ((p - model_fixed[n]) ** 2 ))
+                fisher_loss += _loss
+            loss += (self.lamb/2) * fisher_loss
         return loss
         
         
@@ -115,9 +115,11 @@ class Trainer(trainer.GenericTrainer):
             (loss).backward()
 
             for n, p in self.model.named_parameters():
-                fisher_info[n] += p.grad ** 2 / len(self.fisher_iterator)
+                fisher_info[n] += (p.grad *20) ** 2
+            #20은 batch size of fisher
         
-        fisher_info = {n: p for n, p in fisher_info.items()}
+
+        fisher_info = {n: p/len(self.fisher_iterator.dataset) for n, p in fisher_info.items()}
         return fisher_info
 
         
