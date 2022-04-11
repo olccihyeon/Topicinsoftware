@@ -20,13 +20,12 @@ class Trainer(trainer.GenericTrainer):
         
         self.lamb=args.lamb
     
-        #self.fisher 추가
-        self.fisher = {n: torch.zeros(p.shape) for n, p in self.model.named_parameters()
-                  if p.requires_grad}
+    
 
     def train(self, train_loader, test_loader, t, device = None):
         
         self.device = device
+   
         lr = self.args.lr
         self.setup_training(lr)
         # Do not update self.t
@@ -99,28 +98,32 @@ class Trainer(trainer.GenericTrainer):
         
         This function will be used in the function 'update_fisher'
         """
-        
+        fisher={}
+        for n,p in self.model.named_parameters():
+            fisher[n]=0*p.data
         
         #######################################################################################
-        fisher_info = {n: torch.zeros(p.shape).to(self.device) for n, p in self.model.named_parameters()
-                  if p.requires_grad}
+   
         celoss = nn.CrossEntropyLoss()
         for samples in self.fisher_iterator:
             data, target = samples
             data, target = data.to(self.device), target.to(self.device)
-
+            batch_size = data.shape[0]
+            self.model.zero_grad()
             output = self.model(data)[self.t]
             loss = celoss(output,target)
-            self.optimizer.zero_grad()
+       
             (loss).backward()
 
-            for n, p in self.model.named_parameters():
-                fisher_info[n] += (p.grad *20) ** 2
+            for n,p in self.model.named_parameters():
+                if p.grad is not None:
+                    fisher[n]+=(batch_size)**2*(p.grad**2)
             #20은 batch size of fisher
         
 
-        fisher_info = {n: p/len(self.fisher_iterator.dataset) for n, p in fisher_info.items()}
-        return fisher_info
+           
+        fisher = {n: p/len(self.fisher_iterator.dataset) for n, p in fisher.items()}
+        return fisher
 
         
 
@@ -139,12 +142,18 @@ class Trainer(trainer.GenericTrainer):
         """
         
         #######################################################################################
-        for n, p in self.fisher.items():
-            self.fisher[n] += self.compute_diag_fisher()[n]
+        if self.t>0:
+            fisher_old={}
+            for n,_ in self.model.named_parameters():
+                fisher_old[n]=self.fisher[n].clone()
+        self.fisher=self.compute_diag_fisher()
+        if self.t>0:
+            for n,_ in self.model.named_parameters():
+                self.fisher[n]=(self.fisher[n]+fisher_old[n]*(self.t))/(self.t+1)
         
-        
-        # Write youre code here
         
         
         
         #######################################################################################
+
+
